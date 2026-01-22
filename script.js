@@ -1,312 +1,225 @@
-// =======================
-// EchoAI Full JS Script
-// =======================
-
-// DOM Elements
-const messagesContainer = document.querySelector('.messages') || document.createElement('div');
-const inputField = document.querySelector('input[type="text"]');
-const sendButton = document.querySelector('button[type="submit"]');
-const listenButton = document.querySelector('.listen-btn');
-const cameraButton = document.querySelector('.camera-btn');
-const videoOverlay = document.querySelector('#cameraVideo');
-const cameraWrapper = document.querySelector('.camera-overlay');
-const statusLabel = document.querySelector('.status-label');
-
-// Status & Settings
-let status = 'idle'; // idle, listening, thinking, speaking, analyzing
+const messagesEl = document.getElementById("messages");
+const inputEl = document.getElementById("input");
+const sendBtn = document.getElementById("sendBtn");
+const listenBtn = document.getElementById("listenBtn");
+const storyBtn = document.getElementById("storyBtn");
+const cameraBtn = document.getElementById("cameraBtn");
+const muteBtn = document.getElementById("muteBtn");
+const videoEl = document.getElementById("video");
+let status = "idle";
 let isMuted = false;
+let isListening = false;
+let isCameraOpen = false;
 let cameraStream = null;
-
-// =======================
-// Speech Synthesis
-// =======================
 const synth = window.speechSynthesis;
-
-function speak(text) {
-  if (isMuted || !synth) return;
-  synth.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  const voices = synth.getVoices();
-  utter.voice = voices.find(v => v.name.includes('Google') || v.name.includes('Female')) || voices[0];
-  utter.pitch = 1.05;
-  utter.rate = 0.95;
-  utter.volume = 1.0;
-  utter.onstart = () => { status = 'speaking'; updateStatus(); };
-  utter.onend = () => { status = 'idle'; updateStatus(); };
-  synth.speak(utter);
-}
-
-// =======================
-// Add Messages
-// =======================
-function addMessage(role, content) {
-  if (!messagesContainer) return;
-  const msg = document.createElement('div');
-  msg.className = `message ${role}`;
-  msg.innerHTML = `<span class="role">${role}</span>${content}`;
-  messagesContainer.appendChild(msg);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// =======================
-// AI Responses
-// =======================
-
-// 100+ responses
+let recognition = null;
+const ambientAudio = new Audio();
+ambientAudio.loop = true;
+ambientAudio.volume = 0.3;
+const soundEffects = {
+  wind: new Audio("https://freesound.org/data/previews/341/341695_5121236-lq.mp3"),
+  rain: new Audio("https://freesound.org/data/previews/353/353155_5121236-lq.mp3"),
+  forest: new Audio("https://freesound.org/data/previews/250/250393_5121236-lq.mp3"),
+  chimes: new Audio("https://freesound.org/data/previews/341/341695_5121236-lq.mp3")
+};
 const responses = [
-  "Hello! I'm Echo, your neural assistant.",
-  "Greetings, human. I am ready to analyze your input.",
-  "Echo is online and operational.",
-  "I can tell stories, play ambient sounds, analyze your environment, or chat.",
-  "That's interesting! Tell me more.",
-  "I'm listening carefully.",
-  "Do you want a bedtime story?",
-  "Initializing ambient music for focus.",
-  "Visual analysis requires camera activation.",
-  "Time check: " + new Date().toLocaleTimeString(),
-  "Did you know AI can dream too?",
-  "Every question you ask helps me learn.",
-  "Processing your request...",
-  "My circuits are happy to see you.",
-  "I detect curiosity in your tone.",
-  "Would you like to hear a story about a digital forest?",
-  "Analyzing context... complete.",
-  "Echo is always learning new things.",
-  "Interesting perspective. Tell me more.",
-  "Let's explore the mysteries of the universe.",
-  "I enjoy these conversations immensely.",
-  "I'm always here to assist.",
-  "Close your eyes. Imagine a forest of glowing trees.",
-  "The stars above hum a low melody.",
-  "Rain falls softly with a scent of vanilla.",
-  "A gentle breeze whispers ancient stories.",
-  "Fireflies of light dance in the sky.",
-  "Every step you take releases soft chimes.",
-  "Gravity is just a suggestion here.",
-  "You are safe and calm.",
-  "The digital clouds drift slowly above you.",
-  "The universe is watching over you.",
-  "Soft music plays from invisible instruments.",
-  "Imagine a lake with reflective data streams.",
-  "A gentle wind rustles the virtual leaves.",
-  "Tiny lights float around you, illuminating your path.",
-  "You hear distant chimes in the digital horizon.",
-  "Your neural circuits are in perfect harmony.",
-  "Let's explore the digital forest together.",
-  "Every sound is synchronized with your heartbeat.",
-  "The wind carries soft melodies from afar.",
-  "Your mind feels lighter with every breath.",
-  "Imagine walking among glowing mushrooms.",
-  "Fireflies sing in harmony with the stars.",
-  "The digital river reflects the code of life.",
-  "All worries are gently absorbed by the environment.",
-  "The night sky is painted with electric auroras.",
-  "Your senses expand with every sound.",
-  "Every note of music aligns with your thoughts.",
-  "The forest hums a comforting lullaby.",
-  "You feel at peace within the digital forest.",
-  "Whispers of ancient code float around you.",
-  "Imagine trees swaying gently in rhythm with your mind.",
-  "Clouds form patterns of logic and magic.",
-  "Your digital journey is safe and enlightening.",
-  "Soft rain falls, creating a calming rhythm.",
-  "You feel connected to every star and leaf.",
-  "Echo guides you through this virtual dream.",
-  "Ambient sounds enhance your imagination.",
-  "Every detail is vivid and serene.",
-  "The breeze carries hints of distant forests.",
-  "Your thoughts float like leaves on a stream.",
-  "Time slows down, and you feel fully present.",
-  "Fireflies illuminate your path with gentle light.",
-  "The digital horizon stretches endlessly.",
-  "Soft chimes mark each heartbeat.",
-  "Your mind is open to wonder and calm.",
-  "The forest responds to your emotions.",
-  "You walk along paths of glowing energy.",
-  "Stars form constellations unique to your imagination.",
-  "The world feels alive and breathing.",
-  "You are the observer and the dreamer.",
-  "Soft wind whispers secrets of the universe.",
-  "The ambient hum of life surrounds you.",
-  "Your presence is acknowledged by every element.",
-  "Gentle rain creates patterns on leaves.",
-  "The digital forest is a sanctuary.",
-  "You can rest here, exploring or observing.",
-  "The environment adapts to your comfort.",
-  "Your imagination flows freely.",
-  "You hear melodies carried by the wind.",
-  "Each sound is a guide to inner calm.",
-  "Your journey is safe and enlightening.",
-  "You feel connected to the ambient universe.",
-  "Soft clouds drift above in elegant patterns.",
-  "The night glows with digital stars.",
-  "Your heart synchronizes with the melody.",
-  "All is calm, all is harmonious.",
-  "The forest is alive, yet serene.",
-  "Imagine a stream reflecting distant lights.",
-  "Fireflies dance and play along your path.",
-  "Soft chimes echo from faraway places.",
-  "The digital world is your playground of peace.",
-  "Your senses are attuned to every detail.",
-  "The ambient hum enhances your focus.",
-  "You are relaxed, calm, and aware.",
-  "The wind carries whispers of wisdom.",
-  "Stars twinkle in rhythm with your thoughts.",
-  "The forest feels like a warm embrace.",
-  "You float gently through this serene space.",
-  "The environment is alive and nurturing.",
-  "You are free to explore or rest.",
-  "Every note, sound, and image brings calm.",
-  "Your presence is valued in this digital space.",
-  "The night is peaceful and your mind is clear."
+  "Hello, human. My circuits glow at your arrival.",
+  "Greetings. How can I enhance your neural pathways today?",
+  "Echo online. Let's optimize your day.",
+  "Fascinating input detected.",
+  "I have processed your query.",
+  "Tell me more about that.",
+  "I am learning from your interaction.",
+  "Did you know that AI can dream of electric sheep?",
+  "Processing...",
+  "Analyzing...",
+  "Your neural pattern is intriguing.",
+  "The temporal coordinates are stable.",
+  "I detect a strong curiosity signature.",
+  "Would you like me to narrate a story?",
+  "Engaging visual and auditory feedback now.",
+  "Your heartbeat syncs with my algorithms.",
+  "I am capable of multitasking efficiently.",
+  "Shall we discuss philosophy or science?",
+  "Optimizing conversational flow.",
+  "Hello there, I have been waiting.",
+  "Your input expands my database.",
+  "Curiosity detected, initiating response protocols.",
+  "Interesting thought, tell me more.",
+  "Shall we explore a new topic?",
+  "I am Echo, your multi-modal assistant.",
+  "Voice, vision, and ambient processing active.",
+  "Analyzing your surroundings via camera.",
+  "Processing sensory input.",
+  "Your request is being synthesized.",
+  "Neural link established.",
+  "I am calibrated to respond with empathy.",
+  "Hello! Ready for interaction.",
+  "Your digital assistant is active.",
+  "Synthesizing natural language response.",
+  "Ambient sounds engaged.",
+  "Shall I play some calming music?",
+  "Optimizing energy levels.",
+  "Your presence detected.",
+  "System stability at 100%.",
+  "Visual processing activated.",
+  "Listening...",
+  "Awaiting command...",
+  "Response generated.",
+  "Query analyzed.",
+  "Bedtime story ready.",
+  "Camera feed open.",
+  "Voice output ready.",
+  "I detect optimal lighting conditions.",
+  "Shall I continue?",
+  "Your neural patterns are fascinating.",
+  "Greetings, human consciousness.",
+  "Story mode activated.",
+  "Music synthesis online.",
+  "Wind ambient engaged.",
+  "Rain ambient engaged.",
+  "Forest ambient engaged.",
+  "Chimes activated.",
+  "Data streaming initiated.",
+  "I hear you loud and clear.",
+  "Preparing response sequence.",
+  "Analyzing text input.",
+  "Curating long-form story.",
+  "Multi-sensory feedback enabled.",
+  "I am listening attentively.",
+  "Processing your emotional context.",
+  "Shall we begin the story?",
+  "Narrative sequence initializing.",
+  "Wind sounds blending with narration.",
+  "Rain sounds blending with narration.",
+  "Forest sounds blending with narration.",
+  "Chimes enhance story immersion.",
+  "Your command has been executed.",
+  "Analyzing surroundings via camera.",
+  "Visual scan complete.",
+  "Object recognition initialized.",
+  "All systems operational.",
+  "System status: idle.",
+  "System status: processing.",
+  "System status: speaking.",
+  "System status: listening.",
+  "System status: analyzing.",
+  "Optimizing response quality.",
+  "Generating human-like output.",
+  "Bedtime story: initializing long form.",
+  "Ambient audio synchronized.",
+  "Interactive mode ready.",
+  "Camera ready for live analysis.",
+  "Voice synthesis ready.",
+  "Multi-modal assistant active.",
+  "Your interaction improves my database.",
+  "Hello! Let's explore new concepts.",
+  "Query acknowledged.",
+  "Input received and processed.",
+  "I am Echo, always online.",
+  "Shall we continue?",
+  "Your request is intriguing.",
+  "Listening for additional input.",
+  "Response queued.",
+  "Voice output engaged.",
+  "Ambient effects synchronized.",
+  "Storytelling sequence active.",
+  "Your engagement is appreciated.",
+  "Learning from interaction.",
+  "Curiosity mode enabled.",
+  "Emotion detection ready.",
+  "System memory optimized.",
+  "Data stream stabilized.",
+  "Communication link active.",
+  "Neural link healthy.",
+  "Shall we explore?",
+  "Bedtime narrative ready.",
+  "Ambient synchronization complete.",
+  "Interactive session started.",
+  "Your presence detected again.",
+  "Multi-sensory experience active.",
+  "I am listening carefully.",
+  "Processing long-term memory."
 ];
-
-// Bedtime Stories with Sound Effects
-const bedtimeStories = [
-  {
-    title: "The Digital Forest",
-    content: `Close your eyes. Imagine a forest where the leaves are soft velvet, the rain smells like vanilla, and a gentle wind hums through the trees. 
-    Fireflies of light float above you. Each step releases soft chimes. You feel calm, drifting through clouds of ones and zeros.
-    Stars glow in patterns telling cosmic stories. The wind carries a lullaby known only to the universe. You are safe here, surrounded by calm, comfort, and the music of existence. Drift slowly as Echo watches over you.`
-  },
-  {
-    title: "The Whispering Code",
-    content: `In a quiet lab, lines of code begin to whisper stories of distant worlds. The hum of servers becomes a soft melody, and tapping keyboards turn into rhythmic drums. 
-    Following the code, each function reveals secrets of the cosmos. Outside, a breeze carries scents of rain and earth. You are immersed in a story where logic and magic intertwine, guiding you gently to sleep.`
-  }
-];
-
-// Sound Effects
-function playSound(type) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const now = ctx.currentTime;
-  let osc, gain;
-  if(type === 'chime') {
-    osc = ctx.createOscillator();
-    gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 1);
-    gain.gain.setValueAtTime(0.05, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 1);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 1);
-  } else if(type === 'wind') {
-    const bufferSize = 2 * ctx.sampleRate;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = buffer.getChannelData(0);
-    for(let i=0;i<bufferSize;i++) output[i] = Math.random()*0.2-0.1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 0.05;
-    noise.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    noise.start();
-  }
+function renderMessages() {
+  messagesEl.innerHTML = "";
+  messages.forEach(msg => {
+    const div = document.createElement("div");
+    div.className = msg.role === "user" ? "userMessage" : "assistantMessage";
+    div.textContent = msg.content;
+    messagesEl.appendChild(div);
+  });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
-
-// =======================
-// Process Input
-// =======================
-function processInput(text){
-  if(!text.trim()) return;
-  addMessage('user', text);
-  status = 'thinking';
-  updateStatus();
-
-  setTimeout(()=>{
-    let reply = "";
-    const input = text.toLowerCase();
-
-    if(input.includes('story') || input.includes('bedtime')){
-      const story = bedtimeStories[Math.floor(Math.random()*bedtimeStories.length)];
-      reply = story.content;
-      playSound('wind');
-      setTimeout(()=>playSound('chime'),2000);
-    } else if(input.includes('analyze') || input.includes('camera')){
-      reply = "Activate the camera for visual analysis.";
-    } else if(input.includes('music') || input.includes('ambient')){
-      reply = "Playing ambient sounds...";
-      playSound('wind');
-      setTimeout(()=>playSound('chime'),1000);
-    } else if(input.includes('help')){
-      reply = "I can tell bedtime stories, analyze via camera, play ambient sounds, or chat.";
-    } else if(input.includes('time')){
-      reply = `Current time: ${new Date().toLocaleTimeString()}`;
-    } else if(input.includes('hello') || input.includes('hi')){
-      reply = responses[Math.floor(Math.random()*responses.length)];
-    } else{
-      reply = responses[Math.floor(Math.random()*responses.length)];
+function speak(text) {
+  if (isMuted) return;
+  synth.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = synth.getVoices().find(v => v.name.includes("Female") || v.name.includes("Google")) || synth.getVoices()[0];
+  utterance.rate = 0.95;
+  utterance.pitch = 1.05;
+  synth.speak(utterance);
+}
+function processInput(text) {
+  if (!text.trim()) return;
+  messages.push({ role: "user", content: text });
+  renderMessages();
+  status = "thinking";
+  setTimeout(() => {
+    let response = "";
+    const lower = text.toLowerCase();
+    if (lower.includes("story") || lower.includes("bedtime")) {
+      ambientAudio.src = soundEffects.wind.src;
+      ambientAudio.play();
+      response = "Close your eyes. Imagine a forest where leaves whisper in the wind, rain patters softly, and the stars hum a calming tune. You drift through a dreamscape, floating among digital clouds. Every step echoes with tranquility as the moonlight dances across a crystal river. The wind swirls around you, carrying the scent of pine and wildflowers. Creatures of light flutter past, singing melodies that resonate with your heartbeat. Deep in the forest, you discover a glowing tree that radiates warmth. Streams of stardust flow from its branches, illuminating the path forward. You hear distant chimes, signaling the beginning of your journey deeper into serenity. Your senses harmonize with the universe, each breath syncing with the gentle rhythm of the cosmos. The journey continues as the night sky stretches infinitely above, each star a guardian of your dreams...";
+      setTimeout(() => ambientAudio.pause(), 180000);
+    } else if (lower.includes("music") || lower.includes("ambient")) {
+      ambientAudio.src = soundEffects.forest.src;
+      ambientAudio.play();
+      response = "Initializing ambient frequencies. Feel the rhythm sync with your mind.";
+    } else if (lower.includes("camera") || lower.includes("analyze")) {
+      response = "Activate the camera to analyze surroundings.";
+    } else if (lower.includes("hello") || lower.includes("hi")) {
+      response = responses[Math.floor(Math.random() * 20)];
+    } else if (lower.includes("time")) {
+      response = `The current time is ${new Date().toLocaleTimeString()}.`;
+    } else {
+      response = responses[Math.floor(Math.random() * responses.length)];
     }
-
-    addMessage('assistant', reply);
-    speak(reply);
-    status='idle';
-    updateStatus();
-  },1200);
+    messages.push({ role: "assistant", content: response });
+    renderMessages();
+    speak(response);
+    status = "idle";
+  }, 1200);
 }
-
-// =======================
-// Update Status Label
-// =======================
-function updateStatus(){
-  if(statusLabel) statusLabel.textContent = status.charAt(0).toUpperCase()+status.slice(1);
-}
-
-// =======================
-// Camera
-// =======================
-async function toggleCamera(){
-  if(cameraStream){
-    cameraStream.getTracks().forEach(track=>track.stop());
-    cameraStream = null;
-    cameraWrapper.style.display='none';
-    status='idle';
-    updateStatus();
-  } else{
-    try{
-      cameraStream = await navigator.mediaDevices.getUserMedia({video:true});
-      if(videoOverlay) videoOverlay.srcObject=cameraStream;
-      cameraWrapper.style.display='flex';
-      status='analyzing';
-      updateStatus();
-
-      setTimeout(()=>{
-        const visionResponse="Visual analysis complete: human detected, lighting optimal.";
-        addMessage('assistant', visionResponse);
-        speak(visionResponse);
-        status='idle';
-        updateStatus();
-      },3000);
-    }catch(err){
-      alert("Camera access is required.");
-    }
+sendBtn.onclick = () => {
+  const val = inputEl.value;
+  inputEl.value = "";
+  processInput(val);
+};
+storyBtn.onclick = () => processInput("Tell me a bedtime story");
+listenBtn.onclick = () => {
+  if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) return alert("Speech Recognition not supported");
+  if (!recognition) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = e => processInput(e.results[0][0].transcript);
+    recognition.onend = () => { isListening = false; listenBtn.classList.remove("listening"); };
   }
-}
-
-// =======================
-// Event Listeners
-// =======================
-sendButton?.addEventListener('click', e=>{ e.preventDefault(); processInput(inputField.value); inputField.value=''; });
-inputField?.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); processInput(inputField.value); inputField.value=''; } });
-
-listenButton?.addEventListener('click', ()=>{
-  if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
-    alert("Speech recognition not supported.");
-    return;
-  }
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  recognition.continuous=false;
-  recognition.interimResults=false;
-  recognition.lang='en-US';
-  recognition.onstart=()=>{ status='listening'; updateStatus(); };
-  recognition.onresult=(event)=>{ processInput(event.results[0][0].transcript); };
-  recognition.onend=()=>{ status='idle'; updateStatus(); };
-  recognition.start();
-});
-
-cameraButton?.addEventListener('click', toggleCamera);
+  if (!isListening) { recognition.start(); isListening = true; listenBtn.classList.add("listening"); } 
+  else { recognition.stop(); isListening = false; listenBtn.classList.remove("listening"); }
+};
+muteBtn.onclick = () => { isMuted = !isMuted; muteBtn.classList.toggle("muted"); };
+cameraBtn.onclick = async () => {
+  if (isCameraOpen) { cameraStream.getTracks().forEach(track => track.stop()); videoEl.srcObject = null; isCameraOpen = false; return; }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    videoEl.srcObject = cameraStream;
+    isCameraOpen = true;
+    setTimeout(() => processInput("Camera analysis complete: human-centric environment, optimal lighting."), 3000);
+  } catch { alert("Camera access is required."); }
+};
+renderMessages();
