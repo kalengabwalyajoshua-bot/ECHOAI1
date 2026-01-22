@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EchoAI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <div class="nav-left">
+      <div class="logo-container">
+        <div class="logo-glow"></div>
+        <div class="logo-icon">⚡</div>
+      </div>
+      <div class="logo-text">
+        <h1>ECHO AI</h1>
+        <span>Neural Assistant v2.0</span>
+      </div>
+    </div>
+
+    <div class="nav-right">
+      <button id="helpBtn">❔</button>
+      <button id="muteBtn">🔊</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Left Panel: Core Orb & Camera -->
+    <div class="left-panel">
+      <!-- Ambient Glows -->
+      <div class="ambient-glow glow1"></div>
+      <div class="ambient-glow glow2"></div>
+
+      <!-- Camera Overlay -->
+      <div id="cameraOverlay" class="camera-overlay hidden">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <div class="live-label">LIVE ANALYSIS</div>
+        <button id="closeCameraBtn">✖</button>
+      </div>
+
+      <!-- Core Orb -->
+      <div id="coreOrb" class="core-orb">
+        <div class="inner-orb">
+          <div id="visualizerBars" class="visualizer-bars"></div>
+        </div>
+        <div id="centerIcon" class="center-icon">⚡</div>
+      </div>
+
+      <!-- Status -->
+      <div class="status-info">
+        <h2 id="statusLabel">Ready...</h2>
+        <p id="statusDesc">Tap the bolt or type below to interact</p>
+      </div>
+    </div>
+
+    <!-- Right Panel: Chat & Actions -->
+    <div class="right-panel">
+
+      <!-- Chat History -->
+      <div id="chatHistory" class="chat-history"></div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <button id="cameraBtn">📷 Vision Analysis</button>
+        <button id="storyBtn">🌙 Bedtime Story</button>
+        <button id="musicBtn">🎵 Ambiance</button>
+      </div>
+
+      <!-- Input Panel -->
+      <form id="chatForm" class="chat-form">
+        <button type="button" id="listenBtn">⚡</button>
+        <input type="text" id="chatInput" placeholder="Message Echo...">
+        <button type="submit" id="sendBtn">➡</button>
+      </form>
+    </div>
+
+  </main>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="help-modal hidden">
+    <div class="help-content">
+      <div class="help-header">
+        <h3>COMMAND CENTER</h3>
+        <button id="closeHelpBtn">✖</button>
+      </div>
+      <div class="help-grid">
+        <div>
+          <strong>Voice Control</strong>
+          <p>Tap the bolt to speak naturally.</p>
+        </div>
+        <div>
+          <strong>Vision Mode</strong>
+          <p>Show Echo objects via camera for analysis.</p>
+        </div>
+        <div>
+          <strong>Sleep Mode</strong>
+          <p>Ask for 'Bedtime Stories' to relax.</p>
+        </div>
+        <div>
+          <strong>Atmosphere</strong>
+          <p>Request 'Music' for focus or sleep.</p>
+        </div>
+      </div>
+      <button id="understoodBtn">UNDERSTOOD</button>
+    </div>
+  </div>
+
+</body>
+</html>
