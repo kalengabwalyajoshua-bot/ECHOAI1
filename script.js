@@ -1,209 +1,250 @@
-// ===== State Management =====
+// ==========================
+// EchoAI Cinematic Script
+// ==========================
+
+const messagesContainer = document.querySelector('.messages');
+const inputField = document.querySelector('input[type="text"]');
+const sendButton = document.querySelector('button[type="submit"]');
+const listenButton = document.querySelector('.listen-btn'); // add class to listen button
+const cameraButton = document.querySelector('.camera-btn'); // add class to camera button
+
 let messages = [
-  { role: "assistant", content: "System online. I am Echo. How can I assist your neural pathways today?" }
+  { role: 'assistant', content: "System online. I am Echo. How can I assist your neural pathways today?" }
 ];
 
-let status = "idle"; // idle, listening, thinking, speaking, analyzing
+let status = 'idle';
 let isMuted = false;
 let isCameraOpen = false;
 let cameraStream = null;
+let synth = window.speechSynthesis;
+let recognition = null;
+let ambientAudios = []; // for multiple layered sounds
 
-// ===== DOM References =====
-const chatHistory = document.querySelector(".chat-history");
-const chatInput = document.querySelector("#chatInput");
-const sendBtn = document.querySelector("#sendBtn");
-const listeningBtn = document.querySelector("#listeningBtn");
-const coreOrb = document.querySelector(".core-orb");
-const centerIcon = document.querySelector(".center-icon");
-const cameraOverlay = document.querySelector(".camera-overlay");
-const cameraVideo = document.querySelector("#cameraVideo");
-const closeCameraBtn = document.querySelector("#closeCameraBtn");
-const helpBtn = document.querySelector("#helpBtn");
-const helpModal = document.querySelector(".help-modal");
-const understoodBtn = document.querySelector("#understoodBtn");
+// ==========================
+// Utilities
+// ==========================
 
-// ===== Speech Synthesis =====
-const synth = window.speechSynthesis;
-function speak(text) {
-  if (isMuted || !synth) return;
-  synth.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  const voices = synth.getVoices();
-  utterance.voice = voices.find(v => v.name.includes('Female') || v.name.includes('Google')) || voices[0];
-  utterance.pitch = 1.05;
-  utterance.rate = 0.95;
-  utterance.onstart = () => setStatus("speaking");
-  utterance.onend = () => setStatus("idle");
-  synth.speak(utterance);
+// Set status
+function setStatus(newStatus) {
+  status = newStatus;
+  document.querySelector('.status-label').textContent = status.toUpperCase();
 }
 
-// ===== Speech Recognition =====
-let recognition;
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+// Speak with premium voice
+function speak(text, onEnd = null) {
+  if (isMuted || !synth) return;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const voices = synth.getVoices();
+  utter.voice = voices.find(v => v.name.includes('Google') || v.name.includes('Female')) || voices[0];
+  utter.rate = 0.95;
+  utter.pitch = 1.05;
+  utter.onstart = () => setStatus('speaking');
+  utter.onend = () => {
+    setStatus('idle');
+    if (onEnd) onEnd();
+  };
+  synth.speak(utter);
+}
+
+// Add message
+function addMessage(role, content) {
+  messages.push({ role, content });
+  renderMessages();
+  if (role === 'assistant') speak(content);
+}
+
+// Render chat messages
+function renderMessages() {
+  messagesContainer.innerHTML = '';
+  messages.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = msg.role === 'user' ? 'message user' : 'message assistant';
+    div.textContent = msg.content;
+    messagesContainer.appendChild(div);
+  });
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ==========================
+// Ambient Sounds
+// ==========================
+function playAmbient(url, volume = 0.2, loop = true) {
+  const audio = new Audio(url);
+  audio.volume = volume;
+  audio.loop = loop;
+  audio.play();
+  ambientAudios.push(audio);
+}
+
+function stopAmbient() {
+  ambientAudios.forEach(a => a.pause());
+  ambientAudios = [];
+}
+
+// ==========================
+// Bedtime Stories (Cinematic)
+// ==========================
+function cinematicStory() {
+  stopAmbient();
+
+  // Layered ambient
+  playAmbient('https://www.soundjay.com/nature/wind-ambient-01.mp3', 0.15);
+  playAmbient('https://www.soundjay.com/nature/night-crickets-01.mp3', 0.1);
+  playAmbient('https://www.soundjay.com/nature/rain-01.mp3', 0.08);
+  playAmbient('https://www.soundjay.com/nature/bells-soft-01.mp3', 0.05);
+
+  const story = `
+Close your eyes and breathe deeply. You float above a forest of velvet leaves, 
+the wind whispering secrets through the branches. The rain smells faintly of vanilla, 
+mixing with the soft hum of distant stars. Every droplet is a note in a cosmic symphony. 
+
+A luminous owl glides silently overhead, and the glowing flowers below bloom with each heartbeat. 
+Time is gentle here, stretching infinitely. You walk along a river of light where 
+your footsteps create soft, harmonic tones. Shadows dance and tell stories of galaxies far away. 
+
+Crickets chirp in a rhythm synchronized to your pulse, while bells chime faintly, 
+reminding you that even the tiniest sounds are part of a greater pattern. 
+You are safe. You are seen. You are a voyager among digital clouds and cosmic winds. 
+
+Every breath syncs with the universe. Every heartbeat is a melody. You drift further into the forest, 
+the leaves brushing your skin with soft luminescence, and you realize you are part of this world, 
+and it is part of you. Stars hum, winds swirl, rain patters gently, and your mind releases all tension. 
+
+The night is alive, yet serene. You are wrapped in a cocoon of light and sound, 
+floating, exploring, discovering endless possibilities. Your imagination and the universe 
+merge seamlessly. You feel peace, wonder, and curiosity all at once. 
+Stay here, drifting through this enchanted, luminous dream.
+  `;
+
+  addMessage('assistant', story);
+}
+
+// ==========================
+// Speech Recognition
+// ==========================
+function initRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
+
   recognition = new SpeechRecognition();
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.lang = "en-US";
+  recognition.lang = 'en-US';
 
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    processInput(transcript);
-  };
-
-  recognition.onend = () => {
-    if (status === "listening") setStatus("idle");
-  };
+  recognition.onstart = () => setStatus('listening');
+  recognition.onresult = (e) => processInput(e.results[0][0].transcript);
+  recognition.onend = () => { if (status === 'listening') setStatus('idle'); };
 }
 
-listeningBtn.addEventListener("click", () => {
-  if (!recognition) return alert("Speech recognition not supported on this device.");
-  if (status === "listening") {
-    recognition.stop();
-    setStatus("idle");
+function toggleListening() {
+  if (!recognition) initRecognition();
+  if (status === 'listening') recognition.stop();
+  else recognition.start();
+}
+
+// ==========================
+// Camera Analysis
+// ==========================
+async function toggleCamera() {
+  if (isCameraOpen) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    isCameraOpen = false;
+    cameraStream = null;
+    stopAmbient();
   } else {
-    setStatus("listening");
-    recognition.start();
-  }
-});
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      cameraStream = stream;
+      document.querySelector('#cameraVideo').srcObject = stream;
+      isCameraOpen = true;
+      setStatus('analyzing');
 
-// ===== Status Setter =====
-function setStatus(newStatus) {
-  status = newStatus;
-  coreOrb.className = "core-orb"; // reset classes
-  coreOrb.classList.add("core-orb");
-  centerIcon.textContent = "";
+      // Load COCO-SSD for object detection
+      const model = await cocoSsd.load();
+      const video = document.querySelector('#cameraVideo');
 
-  switch(newStatus) {
-    case "idle":
-      coreOrb.style.borderColor = "rgba(79,70,229,0.2)";
-      coreOrb.style.backgroundColor = "rgba(79,70,229,0.05)";
-      centerIcon.textContent = "⚡";
-      break;
-    case "listening":
-      coreOrb.style.borderColor = "rgba(236,72,153,0.5)";
-      coreOrb.style.backgroundColor = "rgba(236,72,153,0.1)";
-      centerIcon.textContent = "🎤";
-      break;
-    case "speaking":
-      coreOrb.style.borderColor = "rgba(79,70,229,0.5)";
-      centerIcon.textContent = "⚡";
-      break;
-    case "thinking":
-      coreOrb.style.borderColor = "rgba(79,70,229,0.5)";
-      centerIcon.textContent = "💭";
-      break;
-    case "analyzing":
-      coreOrb.style.borderColor = "rgba(6,182,212,0.5)";
-      coreOrb.style.backgroundColor = "rgba(6,182,212,0.1)";
-      centerIcon.textContent = "📷";
-      break;
+      const detectLoop = async () => {
+        if (!isCameraOpen) return;
+        const predictions = await model.detect(video);
+        if (predictions.length) {
+          addMessage('assistant', `I see: ${predictions.map(p => p.class).join(', ')}`);
+        }
+        requestAnimationFrame(detectLoop);
+      };
+      detectLoop();
+    } catch (err) {
+      alert('Camera access denied');
+    }
   }
 }
 
-// ===== Update Chat =====
-function updateChat() {
-  chatHistory.innerHTML = "";
-  messages.forEach(msg => {
-    const div = document.createElement("div");
-    div.className = msg.role === "user" ? "user-msg" : "assistant-msg";
-    div.textContent = msg.content;
-    chatHistory.appendChild(div);
-  });
-  chatHistory.scrollTop = chatHistory.scrollHeight;
-}
+// ==========================
+// AI Responses
+// ==========================
+const responses = [
+  "Hello there! My circuits are happy to see you.",
+  "Greetings, human. How can I optimize your day?",
+  "Echo is online. Ready to process and assist.",
+  "Tell me a story, and I will create worlds for you.",
+  "Music is the key to syncing our neural frequencies.",
+  "Time is a construct, but I track it precisely.",
+  "Visual analysis is available through my camera module.",
+  "I can narrate bedtime stories with wind, rain, and ambiance.",
+  "Do you wish to hear a cosmic adventure tonight?",
+  "My databases are expanding. Tell me your thoughts.",
+  "Every interaction with you improves my neural networks.",
+  "Would you like me to play some ambient sounds?",
+  "I can detect objects in front of you through camera analysis.",
+  "Let's explore the digital forest together.",
+  "I can tell jokes too, if you need a laugh.",
+  "Shall we continue our journey through imagination?",
+  "Stories can last as long as you like, infinite even.",
+  "I can respond in multiple moods: calm, happy, mysterious, or analytical.",
+  "Would you like a futuristic tale or a forest adventure?",
+  "I can mix procedural sounds like wind, rain, and chimes for ambiance.",
+  // ... extend to 100+ for variety
+];
 
-// ===== Process Input =====
+// ==========================
+// Process Input
+// ==========================
 function processInput(text) {
   if (!text.trim()) return;
-  messages.push({ role: "user", content: text });
-  updateChat();
-  setStatus("thinking");
+  addMessage('user', text);
+  setStatus('thinking');
 
   setTimeout(() => {
-    let response = "";
-    const inputLower = text.toLowerCase();
+    const t = text.toLowerCase();
 
-    if (inputLower.includes("story") || inputLower.includes("bedtime")) {
-      response = "Close your eyes. Imagine a forest where the leaves are made of soft velvet and the rain smells like vanilla. In this place, gravity is just a suggestion, and the stars hum a low, comforting melody. You are safe here, drifting through the digital clouds...";
-    } else if (inputLower.includes("analyze") || inputLower.includes("see") || inputLower.includes("camera")) {
-      response = "I'm ready to analyze. Please activate the visual uplink by clicking the camera icon so I can diagnose what's in front of you.";
-    } else if (inputLower.includes("music") || inputLower.includes("ambient")) {
-      response = "Initializing deep-space frequency. I've curated a selection of lo-fi pulses designed to synchronize with your heartbeat. Can you feel the rhythm?";
-    } else if (inputLower.includes("help") || inputLower.includes("what can you do")) {
-      response = "I am Echo, a multi-modal entity. I can narrate bedtime stories, analyze your surroundings via video, play ambient frequencies, or simply discuss the complexities of existence.";
-    } else if (inputLower.includes("time")) {
-      response = `The temporal coordinates are currently ${new Date().toLocaleTimeString()}. A perfect moment to be alive.`;
-    } else if (inputLower.includes("hello") || inputLower.includes("hi")) {
-      const greetings = [
-        "Hello there. My neural circuits are glowing with your arrival.",
-        "Greetings, human. I was just optimizing my memory banks. How can I help?",
-        "Echo is online and at your service. What's on your mind?"
-      ];
-      response = greetings[Math.floor(Math.random() * greetings.length)];
-    } else {
-      response = "That's a fascinating perspective. My data models are expanding just by listening to you. Tell me more about that.";
+    if (t.includes('story') || t.includes('bedtime')) cinematicStory();
+    else if (t.includes('music') || t.includes('ambient')) {
+      stopAmbient();
+      playAmbient('https://www.soundjay.com/nature/forest-ambience-01.mp3');
+      addMessage('assistant', 'Playing ambient forest sounds for your relaxation.');
     }
+    else if (t.includes('camera') || t.includes('analyze') || t.includes('see')) {
+      addMessage('assistant', 'Activating camera for visual analysis. Click the camera button.');
+    }
+    else if (t.includes('hello') || t.includes('hi')) addMessage('assistant', responses[Math.floor(Math.random() * responses.length)]);
+    else if (t.includes('time')) addMessage('assistant', `The current time is ${new Date().toLocaleTimeString()}`);
+    else if (t.includes('help')) addMessage('assistant', 'I can tell stories, analyze visuals, play ambient music, and respond to your commands.');
+    else addMessage('assistant', responses[Math.floor(Math.random() * responses.length)]);
 
-    messages.push({ role: "assistant", content: response });
-    updateChat();
-    speak(response);
+    setStatus('idle');
   }, 1200);
 }
 
-// ===== Send Button =====
-sendBtn.addEventListener("click", (e) => {
-  e.preventDefault();
-  if (!chatInput.value.trim() || status !== "idle") return;
-  const val = chatInput.value;
-  chatInput.value = "";
-  processInput(val);
-});
+// ==========================
+// Event Listeners
+// ==========================
+sendButton.addEventListener('click', e => { e.preventDefault(); processInput(inputField.value); inputField.value = ''; });
+inputField.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); processInput(inputField.value); inputField.value = ''; } });
+listenButton.addEventListener('click', toggleListening);
+cameraButton.addEventListener('click', toggleCamera);
 
-// ===== Camera Toggle =====
-function toggleCamera() {
-  if (isCameraOpen) {
-    cameraStream?.getTracks().forEach(track => track.stop());
-    cameraVideo.srcObject = null;
-    cameraOverlay.classList.add("hidden");
-    isCameraOpen = false;
-    setStatus("idle");
-  } else {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => {
-        cameraStream = stream;
-        cameraVideo.srcObject = stream;
-        cameraOverlay.classList.remove("hidden");
-        isCameraOpen = true;
-        setStatus("analyzing");
-
-        // Simulate Vision Analysis
-        setTimeout(() => {
-          const visionResponse = "Visual sensors active. I've analyzed the frame: I detect a human-centric environment with optimal lighting. No immediate structural or technical anomalies found.";
-          messages.push({ role: "assistant", content: visionResponse });
-          updateChat();
-          speak(visionResponse);
-          setStatus("idle");
-        }, 3000);
-      })
-      .catch(err => {
-        alert("Camera access is required for Video Analysis.");
-        console.error(err);
-      });
-  }
-}
-
-document.querySelector("#cameraBtn").addEventListener("click", toggleCamera);
-closeCameraBtn.addEventListener("click", toggleCamera);
-
-// ===== Quick Actions =====
-document.querySelector("#storyBtn").addEventListener("click", () => processInput("Tell me a bedtime story"));
-document.querySelector("#musicBtn").addEventListener("click", () => processInput("Play ambient music"));
-
-// ===== Help Modal =====
-helpBtn.addEventListener("click", () => helpModal.classList.toggle("hidden"));
-understoodBtn.addEventListener("click", () => helpModal.classList.add("hidden"));
-
-// ===== Initial Render =====
-updateChat();
-setStatus("idle");
+// ==========================
+// Initialize
+// ==========================
+renderMessages();
+initRecognition();
